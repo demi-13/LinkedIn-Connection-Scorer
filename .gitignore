@@ -1,0 +1,24 @@
+# LinkedIn data -- never commit real connection data
+Connections.csv
+scored_leads.csv
+*.csv
+
+# Research briefs contain info on real individuals
+briefs/
+
+# API keys and environment files
+*.env
+.env
+.env.local
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Debug/scratch files
+debug_rows.py
+
+# Windows system files
+desktop.ini
+Thumbs.db
