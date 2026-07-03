@@ -55,31 +55,32 @@ TEST_CASES = [
     # So: "engineer"=+2 + "quality"=+2 in title => 4 -> Top
     ("James", "Wu",      "ChemForm Solutions",      "Quality Engineer",                 4, "Top"),
 
-    # --- Real-world false positive verification cases ---
+    # --- False positive verification cases (patterns observed in real data,
+    #     names/companies fictionalized for public repo) ---
 
-    # WILLWAY GLOBAL: "executive search" in title triggers recruiter hard cap -> 0 -> Skip
-    # (Full real title: "President & CEO | Executive Search | Pharmaceutical, Medical Device, Life Sciences")
-    ("Josephine", "Belfield",  "WILLWAY GLOBAL",                 "President & CEO | Executive Search | Pharmaceutical, Medical Device, Life Sciences & Healthcare", 0, "Skip"),
+    # Company name unrelated to industry, but "executive search" in title triggers
+    # recruiter hard cap -> 0 -> Skip, even with pharma/medtech/life sciences keywords present
+    ("Patricia", "Winford",   "Beacon Global Partners",          "President & CEO | Executive Search | Pharmaceutical, Medical Device, Life Sciences & Healthcare", 0, "Skip"),
 
-    # TekWissen: "recruitment" in title triggers recruiter hard cap -> 0 -> Skip
-    ("Purandhar", "Rayudu",    "TekWissen",                      "Assistant Manager - Pharma, Biotech Recruiting",  0, "Skip"),
+    # "recruiting" in title triggers recruiter hard cap -> 0 -> Skip
+    ("Rajesh", "Vellore",     "Talence Workforce Group",         "Assistant Manager - Pharma, Biotech Recruiting",  0, "Skip"),
 
     # "Undergraduate Student Researcher": student keyword -> hard cap at 1 -> Weak
-    ("Camille",   "White",     "UCLA",                           "Undergraduate Student Researcher",                1, "Weak"),
+    ("Nadia",   "Okafor",     "Westbrook University",            "Undergraduate Student Researcher",                1, "Weak"),
 
-    # Raytheon doesn't contain "defense" or "aerospace" explicitly.
+    # Company name doesn't contain "defense" or "aerospace" explicitly.
     # "materials"=+1 (industry_med). "principal"=+2, "materials"=+2, "engineer"=+2 (title_high).
-    # No penalties. => 7 -> Top (tier unchanged from before the fix)
-    ("Krystal",   "Cunningham","Raytheon",                       "Principal Materials and Process Engineer",         7, "Top"),
+    # No penalties. => 7 -> Top
+    ("Marcus",   "Delacroix", "Silverline Dynamics",             "Principal Materials and Process Engineer",         7, "Top"),
 
     # "lab" substring matches "laboratory" (+1), "laboratory"=+1, "research"=+1, "materials"=+1
     # (industry_med = +4). "materials"=+2, "engineer"=+2 (title_high = +4). No penalties. => 8 -> Top
-    ("SungJoon",  "Lee",       "U.S. Naval Research Laboratory", "Materials Research Engineer",                     8, "Top"),
+    ("Yuki",  "Tanaka",       "Federal Applied Research Laboratory", "Materials Research Engineer",                  8, "Top"),
 
     # Cofounder whose TITLE (not company name) carries the industry signal --
     # "pfas"=+2 (industry_high) via combined text, "cofounder"=+3 (title_exec,
     # gated on combined signal, not company name alone) => 5 -> Top
-    ("Michelle",  "B",         "Acme Ventures",                  "Cofounder, PFAS Remediation Technologies",         5, "Top"),
+    ("Priya",  "Nandakumar",   "Acme Ventures",                  "Cofounder, PFAS Remediation Technologies",         5, "Top"),
 ]
 
 
