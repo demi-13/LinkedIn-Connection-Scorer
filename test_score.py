@@ -23,8 +23,8 @@ TEST_CASES = [
     ("Bob",   "Sharma",  "BioGen Life Sciences",    "Principal Scientist",              8, "Top"),
 
     # "fertility"=+2 (industry_high), "r&d"=+1 (industry_med),
-    # "r&d"=+2 in title_high => 6 -> Top (note: "director" alone is not in title_high)
-    ("Carol", "Lee",     "Fertility Clinic Inc",    "R&D Director",                     6, "Top"),
+    # "r&d"=+2 title_high, "director"=+3 title_exec (company has fertility signal) => 8 -> Top
+    ("Carol", "Lee",     "Fertility Clinic Inc",    "R&D Director",                     8, "Top"),
 
     # "plastics"=+1 (industry_med), "operations"=+1 + "manager"=+1 (title_med) => 3 -> Strong
     ("Dave",  "Kim",     "National Plastics Co",    "Operations Manager",               3, "Strong"),
@@ -75,6 +75,11 @@ TEST_CASES = [
     # "lab" substring matches "laboratory" (+1), "laboratory"=+1, "research"=+1, "materials"=+1
     # (industry_med = +4). "materials"=+2, "engineer"=+2 (title_high = +4). No penalties. => 8 -> Top
     ("SungJoon",  "Lee",       "U.S. Naval Research Laboratory", "Materials Research Engineer",                     8, "Top"),
+
+    # Cofounder whose TITLE (not company name) carries the industry signal --
+    # "pfas"=+2 (industry_high) via combined text, "cofounder"=+3 (title_exec,
+    # gated on combined signal, not company name alone) => 5 -> Top
+    ("Michelle",  "B",         "Acme Ventures",                  "Cofounder, PFAS Remediation Technologies",         5, "Top"),
 ]
 
 

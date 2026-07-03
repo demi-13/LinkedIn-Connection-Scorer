@@ -38,18 +38,21 @@ What happens:
 Scores are additive -- every matching keyword adds points. Typical Top prospects score between 6 and 10.
 
 Industry keywords scanned across Company and Title:
-- +2 each: medtech, medical device, biotech, life science, fertility, IVF, pharma, implant, surgical, diagnostic, etc.
+- +2 each: medtech, medical device, biotech, life science, fertility, IVF, pharma, implant, surgical, diagnostic, PFAS, forever chemicals, etc.
 - +1 each: manufacturing, plastics, polymer, materials, aerospace, chemical, R&D, lab, etc.
 
 Job title keywords scanned on Title only:
-- +2 each: engineer, scientist, researcher, materials, R&D, quality, regulatory, formulation, lab manager, principal, etc.
-- +1 each: manager, founder, owner, CTO, COO, operations, supply chain, etc.
+- **+3 each (decision-makers, prioritized over individual contributors):** CEO, CTO, COO, CSO, Director, VP, Vice President, Founder, Co-Founder, Owner -- but only when the company OR the title itself carries an industry signal. A cofounder whose title mentions PFAS scores high even if their company name is generic. A CEO at a totally unrelated company scores 0 from title.
+- +2 each: engineer, scientist, researcher, materials, R&D, quality, regulatory, formulation, principal, lab manager, technical lead, etc.
+- +1 each: manager, operations, procurement, supply chain
 - -1 each: sales, marketing, HR, social media, finance, etc.
 
+[YOUR_ALIAS] wants people with buying power first. Decision-makers (CEO, CTO, cofounders) now outscore individual-contributor engineers and scientists when both have a relevant industry signal, since they are the ones who can actually greenlight a consulting engagement.
+
 **False positive filters (applied automatically):**
-- Recruiters and executive search professionals are capped at 0 (Skip) regardless of how many industry keywords appear in their title. A pharma recruiter is not a [YOUR_COMPANY] prospect.
+- Recruiters and executive search professionals are capped at 0 (Skip) regardless of how many industry keywords appear in their title. A pharma executive search consultant is not a [YOUR_COMPANY] prospect.
 - Students, interns, and trainees are capped at 1 (Weak).
-- CEOs and Presidents with no technical keywords in their title score 0 from title (not +1).
+- CEOs, Directors, and other exec titles at companies with no industry signal score 0 from the title pass.
 - Companies with staffing/workforce/outsourcing in their name receive a -3 penalty.
 
 Tiers explained:

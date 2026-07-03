@@ -8,6 +8,11 @@ Usage:
 
 import csv
 import sys
+import io
+
+# Ensure Unicode names print safely on Windows terminals
+if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
@@ -18,14 +23,19 @@ INDUSTRY_HIGH = [
     "medtech", "medical device", "medical devices", "biotech", "biomedical",
     "life science", "life sciences", "fertility", "ivf", "reproductive",
     "pharmaceutical", "pharma", "implant", "surgical", "diagnostic",
-    "diagnostics",
+    "diagnostics", "pfas", "per- and polyfluoroalkyl", "polyfluoroalkyl",
+    "forever chemicals", "greentech", "green tech", "nanotech",
+    "nanotechnology",
 ]
 
 INDUSTRY_MED = [
     "manufacturing", "plastics", "polymer", "polymers", "materials",
     "aerospace", "automotive", "defense", "consumer goods", "packaging",
     "industrial", "chemical", "chemicals", "lab", "laboratory",
-    "r&d", "research",
+    "r&d", "research", "adhesive", "adhesives", "coating", "coatings",
+    "composite", "composites", "elastomer", "elastomers", "laminate",
+    "laminates", "film", "films", "sustainable materials", "compostable",
+    "oem", "contract manufacturer", "contract manufacturing",
 ]
 
 TITLE_HIGH = [
@@ -36,9 +46,20 @@ TITLE_HIGH = [
 ]
 
 TITLE_MED = [
-    "manager", "founder", "owner", "co-founder", "cofounder", "president",
-    "procurement", "supply chain", "operations", "cto", "coo",
+    "manager", "procurement", "supply chain", "operations",
+    "process owner", "ops lead",
 ]
+
+# Exec titles: worth +3 (outranks individual-contributor engineers/scientists)
+# but only when company or title carries an industry signal.
+# A CEO/CTO/co-founder at a relevant company is a decision-maker worth pursuing.
+# A CEO at a totally unrelated company is noise.
+# Uses word-boundary matching to avoid "cto" matching "doctor" etc.
+TITLE_EXEC = [
+    "ceo", "cto", "coo", "cso", "director", "vp", "vice president",
+    "founder", "owner", "co-founder", "cofounder",
+]
+TITLE_EXEC_WEIGHT = 3
 
 TITLE_NEG = [
     "sales", "marketing", "recruiter", "recruiting", "hr ", " hr",
@@ -67,64 +88,62 @@ STUDENT_KEYWORDS = [
     "mba student", "intern", "trainee",
 ]
 
-# Exec-only titles: score 0 from title unless at least one technical keyword
-# is also present in the position
-EXEC_ONLY = [
-    "ceo", "president", "founder", "owner", "co-founder", "cofounder",
-]
-
-TECHNICAL_TITLE_SIGNALS = [
-    "engineer", "scientist", "r&d", "materials", "formulation",
-    "researcher", "technical", "product development", "quality",
-    "regulatory", "procurement",
-]
+import re
 
 
 def _contains(text: str, keywords: list[str]) -> list[str]:
-    """Return which keywords appear in text (case-insensitive)."""
+    """Return which keywords appear in text (case-insensitive, substring)."""
     lower = text.lower()
     return [kw for kw in keywords if kw in lower]
+
+
+def _contains_word(text: str, keywords: list[str]) -> list[str]:
+    """Return which keywords appear as whole words (avoids 'cto' matching 'doctor')."""
+    lower = text.lower()
+    return [kw for kw in keywords if re.search(r'\b' + re.escape(kw) + r'\b', lower)]
 
 
 def _is_student(position: str) -> bool:
     pos = position.lower()
     if any(kw in pos for kw in STUDENT_KEYWORDS):
         return True
-    # "fellow" only counts as student if paired with student/graduate context
     if "fellow" in pos and ("student" in pos or "graduate" in pos):
         return True
     return False
 
 
-def _exec_only_no_technical(position: str) -> bool:
-    """True if position has exec keywords but zero technical signals."""
-    pos = position.lower()
-    has_exec = any(kw in pos for kw in EXEC_ONLY)
-    has_technical = any(kw in pos for kw in TECHNICAL_TITLE_SIGNALS)
-    return has_exec and not has_technical
+def _has_industry_signal(company: str, position: str) -> bool:
+    """True if company OR title carries an industry signal (e.g. a cofounder
+    whose title mentions PFAS/materials even if the company name doesn't)."""
+    combined = f"{company} {position}".lower()
+    return bool(_contains(combined, INDUSTRY_HIGH) or _contains(combined, INDUSTRY_MED))
 
 
 def score_row(company: str, position: str) -> int:
     combined = f"{company} {position}".lower()
     score = 0
 
-    # Industry signals
+    # Industry signals (company + title combined)
     score += 2 * len(_contains(combined, INDUSTRY_HIGH))
     score += 1 * len(_contains(combined, INDUSTRY_MED))
 
-    # Title signals
+    # Technical title signals
     score += 2 * len(_contains(position, TITLE_HIGH))
 
-    # Exec-only titles with no technical grounding contribute 0 from TITLE_MED
-    if not _exec_only_no_technical(position):
-        score += 1 * len(_contains(position, TITLE_MED))
+    # Non-exec business titles
+    score += 1 * len(_contains(position, TITLE_MED))
+
+    # Exec titles: +3 each (outranks engineer +2) if company OR title has an
+    # industry signal. Uses word-boundary matching so "cto" doesn't match "doctor".
+    if _has_industry_signal(company, position):
+        score += TITLE_EXEC_WEIGHT * len(_contains_word(position, TITLE_EXEC))
 
     score -= 1 * len(_contains(position, TITLE_NEG))
 
     # Staffing/recruiting firm penalty
     score -= 3 * len(_contains(company, COMPANY_NEG))
 
-    # Recruiter hard cap: industry keywords in a recruiter's title are noise, not signal
+    # Recruiter hard cap
     if _contains(position, TITLE_RECRUITER_NEG):
         score = min(score, 0)
 
