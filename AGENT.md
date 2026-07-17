@@ -102,6 +102,32 @@ If the Confidence rating is Low, review the brief before sending anything. It me
 
 ---
 
+## Step 5 -- Monthly Batch Import to Zoho CRM
+
+`monthly_lead_import.py` runs the monthly automation: score a fresh connections CSV, skip anyone already surfaced in a prior run, cross-reference Zoho CRM, and create Leads for the top net-new prospects.
+
+```
+python monthly_lead_import.py --csv Connections.csv
+python monthly_lead_import.py --csv Connections.csv --dry-run
+python monthly_lead_import.py --csv Connections.csv --batch-size 25
+```
+
+**Batch selection with backfill:** the script does not simply take the top 25 scores and stop. It walks the full sorted candidate pool one contact at a time, in score order, and skips anyone who already exists in Zoho (Lead or Contact). Every skip pulls in the next-highest-scoring unmatched contact to take its place, so the batch keeps filling until it reaches the target batch size (default 25) or the candidate pool runs out -- whichever comes first. This means the final batch size can only fall short of the target when there genuinely aren't enough net-new candidates left, not because top-scored people happened to already be in CRM.
+
+Each contact is only ever examined once per run (single pass, no re-scanning), so a contact flagged as already-in-CRM can never later be double-counted as its own backfill.
+
+The terminal prints a **Selection / backfill log** before the summary, showing exactly what happened:
+```
+SKIP (already in CRM): Jane Doe (Acme Corp) -- score 8
+BACKFILL: replaced Jane Doe (already in CRM) with John Smith, score 7
+ACCEPT: Maria Lopez (BetaLabs) -- score 6
+```
+Use this to sanity-check the batch before it goes out, especially in `--dry-run` mode.
+
+Scoring itself (role/industry fit, recruiter penalty, student cap) is unchanged -- it's imported directly from `score_leads.py`, so this step never drifts from the main scorer. `Scorer_Batch_Date` and `Lead_Score_Raw` are still stamped on every created Lead exactly as before.
+
+---
+
 ## Troubleshooting
 
 **"File not found" when running score_leads.py**

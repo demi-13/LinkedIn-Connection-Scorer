@@ -326,13 +326,24 @@ def main():
         scored.append((name, company, title, s, key))
 
     scored.sort(key=lambda x: x[3], reverse=True)
-    batch = scored[: args.batch_size]
 
     new_leads = []
     flagged_contacts = []
+    backfill_log = []
+    pending_skips = []
     batch_date = date.today().isoformat()
+    pool_size = 0
 
-    for name, company, title, s, key in batch:
+    # Single pass over the full sorted candidate pool: keep pulling the next
+    # highest-scoring unmatched contact until the batch is full of net-new
+    # leads, or the pool runs out. Each candidate is examined exactly once,
+    # so a contact flagged as already-in-CRM can never later be reconsidered
+    # as its own backfill.
+    for name, company, title, s, key in scored:
+        if len(new_leads) >= args.batch_size:
+            break
+        pool_size += 1
+
         try:
             exists = client.find_existing_lead_or_contact(name, company)
         except Exception as e:
@@ -341,24 +352,39 @@ def main():
 
         if exists:
             flagged_contacts.append((name, company, s))
-        else:
-            if args.dry_run:
-                print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})")
-            else:
-                try:
-                    client.create_lead(name, company, title, s, batch_date)
-                except Exception as e:
-                    errors.append(f"Create failed for {name} ({company}): {e}")
-                    continue
-            new_leads.append((name, company, s))
+            pending_skips.append(name)
+            backfill_log.append(f"SKIP (already in CRM): {name} ({company}) -- score {s}")
+            surfaced.add(key)
+            continue
 
+        if args.dry_run:
+            print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})")
+        else:
+            try:
+                client.create_lead(name, company, title, s, batch_date)
+            except Exception as e:
+                errors.append(f"Create failed for {name} ({company}): {e}")
+                continue
+
+        new_leads.append((name, company, s))
+        if pending_skips:
+            replaced = pending_skips.pop(0)
+            backfill_log.append(f"BACKFILL: replaced {replaced} (already in CRM) with {name}, score {s}")
+        else:
+            backfill_log.append(f"ACCEPT: {name} ({company}) -- score {s}")
         surfaced.add(key)
+
+    if backfill_log:
+        print("\n--- Selection / backfill log ---")
+        for line in backfill_log:
+            print(line)
+        print("---------------------------------\n")
 
     if not args.dry_run:
         save_surfaced_local(surfaced)
 
     send_summary_email(client, new_leads, flagged_contacts,
-                       args.batch_size, len(batch), errors, args.dry_run)
+                       args.batch_size, pool_size, errors, args.dry_run)
 
     if errors:
         sys.exit(1)
