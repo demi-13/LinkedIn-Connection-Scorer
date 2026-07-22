@@ -29,6 +29,7 @@ import csv
 import io
 import json
 import os
+import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -173,20 +174,21 @@ class ZohoClient:
                 return True
         return False
 
-    def create_lead(self, name: str, company: str, title: str, score: int, batch_date: str):
+    def create_lead(self, name: str, company: str, title: str, score: int, batch_date: str, email: str = ""):
         first, _, last = name.partition(" ")
-        payload = {
-            "data": [{
-                "First_Name": first if last else "",
-                "Last_Name": last or name,
-                "Company": company,
-                "Designation": title,
-                "Lead_Source": "Lead Scorer",
-                "Lead_Status": "New Connection",
-                "Scorer_Batch_Date": batch_date,
-                "Lead_Score_Raw": score,
-            }]
+        lead_data = {
+            "First_Name": first if last else "",
+            "Last_Name": last or name,
+            "Company": company,
+            "Designation": title,
+            "Lead_Source": "Lead Scorer",
+            "Lead_Status": "New Connection",
+            "Scorer_Batch_Date": batch_date,
+            "Lead_Score_Raw": score,
         }
+        if email:
+            lead_data["Email"] = email
+        payload = {"data": [lead_data]}
         resp = requests.post(f"{ZOHO_API_BASE}/Leads", headers=self._headers(), json=payload)
         resp.raise_for_status()
         result = resp.json()["data"][0]
@@ -230,8 +232,10 @@ def read_connections(csv_path: str) -> list:
         name = f"{(row.get('First Name') or '').strip()} {(row.get('Last Name') or '').strip()}".strip()
         company = (row.get("Company") or "").strip()
         title = (row.get("Position") or "").strip()
+        email = (row.get("Email Address") or "").strip()
+        profile_url = (row.get("URL") or "").strip()
         if name and company:
-            rows.append((name, company, title))
+            rows.append((name, company, title, email, profile_url))
     return rows
 
 
@@ -239,7 +243,8 @@ def read_connections(csv_path: str) -> list:
 # Email summary
 # ---------------------------------------------------------------------------
 
-def send_summary_email(client, new_leads, flagged_contacts, batch_size, pool_size, errors, dry_run: bool):
+def send_summary_email(client, new_leads, flagged_contacts, batch_size, pool_size, errors, dry_run: bool,
+                       needs_linkmatch=None):
     recipients = os.environ.get("MONTHLY_IMPORT_RECIPIENTS", "").split(",")
     recipients = [r.strip() for r in recipients if r.strip()]
 
@@ -253,6 +258,11 @@ def send_summary_email(client, new_leads, flagged_contacts, batch_size, pool_siz
     for n, c, s in flagged_contacts:
         lines.append(f"  - {n} ({c}) -- score {s}")
     lines.append("")
+    if needs_linkmatch:
+        lines.append(f"No email on file, add via LinkMatch: {len(needs_linkmatch)}")
+        for n, c, url in needs_linkmatch:
+            lines.append(f"  - {n} ({c}): {url}" if url else f"  - {n} ({c})")
+        lines.append("")
     if pool_size < batch_size:
         lines.append(f"NOTE: only {pool_size} unsurfaced leads with a usable score remained in the "
                      f"pool this month (target batch size was {batch_size}). Time to request a "
@@ -283,7 +293,8 @@ def send_summary_email(client, new_leads, flagged_contacts, batch_size, pool_siz
         return
 
     try:
-        client.send_mail(recipients, f"Monthly Lead Scorer Run -- {today}", body)
+        email_body = re.sub(r"(https?://\S+)", r'<a href="\1">\1</a>', body)
+        client.send_mail(recipients, f"Monthly Lead Scorer Run -- {today}", email_body)
         print(f"Summary emailed to: {', '.join(recipients)}")
     except Exception as e:
         print(f"Could not send email automatically ({type(e).__name__}: {e}). "
@@ -316,19 +327,20 @@ def main():
         errors.append(f"Could not read surfaced leads from CRM, using local state only: {e}")
 
     scored = []
-    for name, company, title in read_connections(args.csv):
+    for name, company, title, email, profile_url in read_connections(args.csv):
         key = lead_key(name, company)
         if key in surfaced:
             continue
         s = score_row(company, title)
         if s <= 0:
             continue
-        scored.append((name, company, title, s, key))
+        scored.append((name, company, title, email, profile_url, s, key))
 
-    scored.sort(key=lambda x: x[3], reverse=True)
+    scored.sort(key=lambda x: x[5], reverse=True)
 
     new_leads = []
     flagged_contacts = []
+    needs_linkmatch = []  # created leads with no email -- [YOUR_ALIAS] adds email via LinkMatch manually
     backfill_log = []
     pending_skips = []
     batch_date = date.today().isoformat()
@@ -339,7 +351,7 @@ def main():
     # leads, or the pool runs out. Each candidate is examined exactly once,
     # so a contact flagged as already-in-CRM can never later be reconsidered
     # as its own backfill.
-    for name, company, title, s, key in scored:
+    for name, company, title, email, profile_url, s, key in scored:
         if len(new_leads) >= args.batch_size:
             break
         pool_size += 1
@@ -358,15 +370,18 @@ def main():
             continue
 
         if args.dry_run:
-            print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})")
+            print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})"
+                  f"{'' if email else ' -- NO EMAIL, would need LinkMatch'}")
         else:
             try:
-                client.create_lead(name, company, title, s, batch_date)
+                client.create_lead(name, company, title, s, batch_date, email)
             except Exception as e:
                 errors.append(f"Create failed for {name} ({company}): {e}")
                 continue
 
         new_leads.append((name, company, s))
+        if not email:
+            needs_linkmatch.append((name, company, profile_url))
         if pending_skips:
             replaced = pending_skips.pop(0)
             backfill_log.append(f"BACKFILL: replaced {replaced} (already in CRM) with {name}, score {s}")
@@ -384,7 +399,8 @@ def main():
         save_surfaced_local(surfaced)
 
     send_summary_email(client, new_leads, flagged_contacts,
-                       args.batch_size, pool_size, errors, args.dry_run)
+                       args.batch_size, pool_size, errors, args.dry_run,
+                       needs_linkmatch)
 
     if errors:
         sys.exit(1)

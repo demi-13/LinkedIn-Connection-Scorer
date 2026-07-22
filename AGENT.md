@@ -126,6 +126,8 @@ Use this to sanity-check the batch before it goes out, especially in `--dry-run`
 
 Scoring itself (role/industry fit, recruiter penalty, student cap) is unchanged -- it's imported directly from `score_leads.py`, so this step never drifts from the main scorer. `Scorer_Batch_Date` and `Lead_Score_Raw` are still stamped on every created Lead exactly as before.
 
+**Missing emails -- LinkMatch follow-up list:** LinkedIn only includes a connection's email in the export if that person has enabled "let connections see my email" in their own settings, so most rows won't have one. When a Lead is created and the CSV had no email for them, the Lead is still created normally, and they're listed directly in the run summary email under "No email on file, add via LinkMatch" -- name, company, and a clickable LinkedIn profile link. [YOUR_ALIAS] works this list manually with the LinkMatch Chrome extension the same way she already does today -- this is not automated, since bulk automated actions against LinkedIn risk the account getting flagged. If a connection did have an email in the CSV, it's written straight onto the Lead's `Email` field and they won't appear on this list.
+
 ---
 
 ## Troubleshooting
