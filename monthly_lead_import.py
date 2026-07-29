@@ -15,8 +15,7 @@ Run this once a month. Requires a fresh LinkedIn CSV export as input
 Scoring rules are NOT defined here -- they are imported from score_leads.py
 in this folder, so the monthly import always matches the original scorer.
 
-Credentials load from the shared .env file at:
-    C:\\Users\\demio\\outreach-emailer\\.env
+Credentials load from a .env file in this folder.
 
 Usage:
     python monthly_lead_import.py --csv path/to/connections.csv
@@ -47,7 +46,7 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() != "utf-8":
 # Config
 # ---------------------------------------------------------------------------
 
-ENV_PATH = Path(r"C:\Users\demio\outreach-emailer\.env")
+ENV_PATH = Path(__file__).parent / ".env"
 DEFAULT_BATCH_SIZE = 25
 LOG_DIR = Path(__file__).parent / "logs"
 LOG_DIR.mkdir(exist_ok=True)

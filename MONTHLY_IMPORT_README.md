@@ -10,7 +10,7 @@ This agent scores a fresh LinkedIn connections export, filters out anyone alread
 
    If these ever get deleted, ask Claude Code to recreate them via the Zoho CRM API (`createFields`) before the next run.
 
-2. A `.env` file at `C:\Users\demio\outreach-emailer\.env` containing:
+2. A `.env` file in this folder containing:
 
    ```
    ZOHO_CLIENT_ID=...
@@ -19,7 +19,7 @@ This agent scores a fresh LinkedIn connections export, filters out anyone alread
    MONTHLY_IMPORT_RECIPIENTS=you@yourcompany.com,demo-assistant@example.com
    ```
 
-   (Same file already used by the other agents. `MONTHLY_IMPORT_RECIPIENTS` was added 2026-07-07 — update it when Demi's address should come off the list.)
+   (`MONTHLY_IMPORT_RECIPIENTS` was added 2026-07-07 — update it when Demi's address should come off the list.)
 
 3. A fresh LinkedIn connections CSV export. LinkedIn does not support automated export, so this one step stays manual: go to LinkedIn → Settings → Data Privacy → Get a copy of your data → Connections, download the CSV once it's ready (can take a few minutes to a few hours), and save it somewhere easy to point this script at.
 

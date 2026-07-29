@@ -92,8 +92,8 @@ cd linkedin-lead-agent
 # Install dependencies
 pip install anthropic python-dotenv
 
-# Add your Anthropic API key to a .env file
-echo "ANTHROPIC_API_KEY=your_key_here" > ../outreach-emailer.env
+# Add your Anthropic API key to a .env file in this folder
+echo "ANTHROPIC_API_KEY=your_key_here" > .env
 ```
 
 **Download your LinkedIn connections:**
