@@ -189,6 +189,7 @@ class ZohoClient:
             "Lead_Status": "New Connection",
             "Scorer_Batch_Date": batch_date,
             "Lead_Score_Raw": score,
+            "pipeline_Entry_Date": batch_date,
         }
         if email:
             lead_data["Email"] = email
