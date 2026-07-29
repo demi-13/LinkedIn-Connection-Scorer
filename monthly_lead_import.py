@@ -143,12 +143,17 @@ class ZohoClient:
     def find_existing_lead_or_contact(self, name: str, company: str) -> bool:
         """Return True if a Lead or Contact with this name + company already exists."""
         company_l = (company or "").strip().lower()
+        # LinkedIn puts credentials (PhD, MBA, Ph.D., RAC, etc.) after a comma
+        # in the last name, which CRM records for the same person usually
+        # don't have. Match on the name before the first comma so "Haley
+        # Titus, PhD, MBA" still matches an existing "Haley Titus" record.
+        core_name = name.split(",")[0].strip()
 
         # Leads have a Company field, so the API can match name + company directly.
         resp = requests.get(
             f"{ZOHO_API_BASE}/Leads/search",
             headers=self._headers(),
-            params={"criteria": f"((Full_Name:equals:{_esc(name)})and(Company:equals:{_esc(company)}))"},
+            params={"criteria": f"((Full_Name:equals:{_esc(core_name)})and(Company:equals:{_esc(company)}))"},
         )
         if resp.status_code == 200 and resp.json().get("data"):
             return True
@@ -159,7 +164,7 @@ class ZohoClient:
         resp = requests.get(
             f"{ZOHO_API_BASE}/Contacts/search",
             headers=self._headers(),
-            params={"criteria": f"(Full_Name:equals:{_esc(name)})"},
+            params={"criteria": f"(Full_Name:equals:{_esc(core_name)})"},
         )
         if resp.status_code == 204:
             return False
@@ -181,7 +186,7 @@ class ZohoClient:
             "Last_Name": last or name,
             "Company": company,
             "Designation": title,
-            "Lead_Source": "Lead Scorer",
+            "Lead_Source": "LinkedIn",
             "Lead_Status": "New Connection",
             "Scorer_Batch_Date": batch_date,
             "Lead_Score_Raw": score,
@@ -340,19 +345,22 @@ def main():
 
     new_leads = []
     flagged_contacts = []
-    needs_linkmatch = []  # created leads with no email -- [YOUR_ALIAS] adds email via LinkMatch manually
+    needs_linkmatch = []  # no email on file -- not created, [YOUR_ALIAS] adds via LinkMatch manually
     backfill_log = []
     pending_skips = []
     batch_date = date.today().isoformat()
     pool_size = 0
+    window_filled = 0  # net-new (not already-in-CRM) contacts placed in the top-25 window
 
-    # Single pass over the full sorted candidate pool: keep pulling the next
-    # highest-scoring unmatched contact until the batch is full of net-new
-    # leads, or the pool runs out. Each candidate is examined exactly once,
-    # so a contact flagged as already-in-CRM can never later be reconsidered
-    # as its own backfill.
+    # Walk the sorted pool and fill a fixed-size window of net-new (not
+    # already-in-CRM) contacts -- backfilling only past duplicates, since
+    # that's a small, cheap lookup. Missing an email does NOT trigger more
+    # searching: once someone lands in the window, they either get created
+    # (has email) or go straight to the LinkMatch list (no email), full stop.
+    # Each candidate is examined exactly once, so nobody can be reconsidered
+    # as their own backfill.
     for name, company, title, email, profile_url, s, key in scored:
-        if len(new_leads) >= args.batch_size:
+        if window_filled >= args.batch_size:
             break
         pool_size += 1
 
@@ -369,9 +377,22 @@ def main():
             surfaced.add(key)
             continue
 
+        window_filled += 1
+        note = ""
+        if pending_skips:
+            replaced = pending_skips.pop(0)
+            note = f" [BACKFILL for {replaced}, already in CRM]"
+
+        if not email:
+            # Not marked surfaced -- keeps reappearing every run until [YOUR_ALIAS]
+            # adds them via LinkMatch (at which point they'll show up as
+            # already-in-CRM instead).
+            needs_linkmatch.append((name, company, profile_url))
+            backfill_log.append(f"NO EMAIL, added to LinkMatch list: {name} ({company}) -- score {s}{note}")
+            continue
+
         if args.dry_run:
-            print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})"
-                  f"{'' if email else ' -- NO EMAIL, would need LinkMatch'}")
+            print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})")
         else:
             try:
                 client.create_lead(name, company, title, s, batch_date, email)
@@ -380,13 +401,7 @@ def main():
                 continue
 
         new_leads.append((name, company, s))
-        if not email:
-            needs_linkmatch.append((name, company, profile_url))
-        if pending_skips:
-            replaced = pending_skips.pop(0)
-            backfill_log.append(f"BACKFILL: replaced {replaced} (already in CRM) with {name}, score {s}")
-        else:
-            backfill_log.append(f"ACCEPT: {name} ({company}) -- score {s}")
+        backfill_log.append(f"ACCEPT: {name} ({company}) -- score {s}{note}")
         surfaced.add(key)
 
     if backfill_log:
