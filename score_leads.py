@@ -75,21 +75,19 @@ COMPANY_NEG = [
     "hr solutions", "manpower", "outsourcing",
 ]
 
+# Hard cap at 0 for specific known non-fit companies whose name gives no
+# generic keyword to key off of (e.g. a recruiting firm with an initialism
+# name). Add to this list as they're identified -- a -3 COMPANY_NEG penalty
+# isn't enough to drop a high-scoring exec title out of the Top tier.
+COMPANY_HARD_SKIP = [
+    "spi of chicago",  # executive search firm for plastics/packaging/chemicals
+]
+
 # Hard cap at 0 if title signals a recruiter role (industry keywords in their title are noise)
 TITLE_RECRUITER_NEG = [
     "recruiter", "recruiting", "recruitment", "talent acquisition", "talent partner",
     "sourcer", "sourcing", "staffing", "people operations", "people partner",
     "executive search",
-]
-
-# Hard cap at 0 for specific companies known to be staffing/recruiting firms
-# despite a generic-sounding name and job titles that don't say so (the
-# staffing signal only shows up in LinkedIn's company "About" text, which
-# isn't in the CSV export, so keyword matching alone can't catch these).
-# Match on exact company name (case-insensitive), not substring, to avoid
-# accidentally excluding unrelated companies with similar words.
-MANUAL_EXCLUDE_COMPANIES = [
-    "spi of chicago, inc.",  # talent acquisition franchisor -- confirmed by [YOUR_ALIAS]
 ]
 
 # Hard cap at 1 if title contains any of these (student / trainee signals)
@@ -157,8 +155,8 @@ def score_row(company: str, position: str) -> int:
     if _contains(position, TITLE_RECRUITER_NEG):
         score = min(score, 0)
 
-    # Manually-known staffing firm hard cap (company name alone doesn't say so)
-    if company.strip().lower() in MANUAL_EXCLUDE_COMPANIES:
+    # Known non-fit company hard cap
+    if _contains(company, COMPANY_HARD_SKIP):
         score = min(score, 0)
 
     # Student hard cap
