@@ -82,6 +82,16 @@ TITLE_RECRUITER_NEG = [
     "executive search",
 ]
 
+# Hard cap at 0 for specific companies known to be staffing/recruiting firms
+# despite a generic-sounding name and job titles that don't say so (the
+# staffing signal only shows up in LinkedIn's company "About" text, which
+# isn't in the CSV export, so keyword matching alone can't catch these).
+# Match on exact company name (case-insensitive), not substring, to avoid
+# accidentally excluding unrelated companies with similar words.
+MANUAL_EXCLUDE_COMPANIES = [
+    "spi of chicago, inc.",  # talent acquisition franchisor -- confirmed by [YOUR_ALIAS]
+]
+
 # Hard cap at 1 if title contains any of these (student / trainee signals)
 STUDENT_KEYWORDS = [
     "undergraduate", "grad student", "phd student", "ms student",
@@ -145,6 +155,10 @@ def score_row(company: str, position: str) -> int:
 
     # Recruiter hard cap
     if _contains(position, TITLE_RECRUITER_NEG):
+        score = min(score, 0)
+
+    # Manually-known staffing firm hard cap (company name alone doesn't say so)
+    if company.strip().lower() in MANUAL_EXCLUDE_COMPANIES:
         score = min(score, 0)
 
     # Student hard cap
