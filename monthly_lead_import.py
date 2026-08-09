@@ -363,6 +363,7 @@ def main():
         if window_filled >= args.batch_size:
             break
         pool_size += 1
+        print(f"Checking {name} ({company}) -- score {s}...")
 
         try:
             exists = client.find_existing_lead_or_contact(name, company)
@@ -373,7 +374,9 @@ def main():
         if exists:
             flagged_contacts.append((name, company, s))
             pending_skips.append(name)
-            backfill_log.append(f"SKIP (already in CRM): {name} ({company}) -- score {s}")
+            msg = f"SKIP (already in CRM): {name} ({company}) -- score {s}"
+            backfill_log.append(msg)
+            print(f"  -> {msg}")
             surfaced.add(key)
             continue
 
@@ -388,11 +391,13 @@ def main():
             # adds them via LinkMatch (at which point they'll show up as
             # already-in-CRM instead).
             needs_linkmatch.append((name, company, profile_url))
-            backfill_log.append(f"NO EMAIL, added to LinkMatch list: {name} ({company}) -- score {s}{note}")
+            msg = f"NO EMAIL, added to LinkMatch list: {name} ({company}) -- score {s}{note}"
+            backfill_log.append(msg)
+            print(f"  -> {msg}")
             continue
 
         if args.dry_run:
-            print(f"[DRY RUN] Would create Lead: {name} @ {company} (score {s})")
+            print(f"  -> [DRY RUN] Would create Lead: {name} @ {company} (score {s})")
         else:
             try:
                 client.create_lead(name, company, title, s, batch_date, email)
@@ -401,7 +406,9 @@ def main():
                 continue
 
         new_leads.append((name, company, s))
-        backfill_log.append(f"ACCEPT: {name} ({company}) -- score {s}{note}")
+        msg = f"ACCEPT: {name} ({company}) -- score {s}{note}"
+        backfill_log.append(msg)
+        print(f"  -> {msg}")
         surfaced.add(key)
 
     if backfill_log:
