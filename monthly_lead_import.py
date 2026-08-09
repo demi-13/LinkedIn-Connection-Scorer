@@ -30,7 +30,7 @@ import json
 import os
 import re
 import sys
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -180,6 +180,11 @@ class ZohoClient:
 
     def create_lead(self, name: str, company: str, title: str, score: int, batch_date: str, email: str = ""):
         first, _, last = name.partition(" ")
+        # pipeline_Entry_Date is a datetime field in Zoho (despite the plain
+        # date value Scorer_Batch_Date uses) -- needs a full ISO 8601
+        # datetime with timezone offset, e.g. "2026-08-09T16:00:00-05:00",
+        # or Zoho rejects the create with INVALID_DATA.
+        entry_datetime = datetime.now().astimezone().replace(microsecond=0).isoformat()
         lead_data = {
             "First_Name": first if last else "",
             "Last_Name": last or name,
@@ -189,7 +194,7 @@ class ZohoClient:
             "Lead_Status": "New Connection",
             "Scorer_Batch_Date": batch_date,
             "Lead_Score_Raw": score,
-            "pipeline_Entry_Date": batch_date,
+            "pipeline_Entry_Date": entry_datetime,
         }
         if email:
             lead_data["Email"] = email
