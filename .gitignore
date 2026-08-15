@@ -2,6 +2,8 @@
 Connections.csv
 scored_leads.csv
 *.csv
+surfaced_leads.json
+logs/
 
 # Research briefs contain info on real individuals
 briefs/

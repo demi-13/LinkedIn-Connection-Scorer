@@ -2,7 +2,7 @@
 
 ## What This Tool Does
 
-This tool scores your LinkedIn connections by how likely they are to need [YOUR_COMPANY]'s services, then batch-imports the top net-new prospects into Zoho CRM as Leads once a month. Scoring runs entirely offline (no internet, no API calls needed).
+This tool scores your LinkedIn connections by how likely they are to need [YOUR_COMPANY]'s services, lets you generate a deep research brief on any promising contact, and batch-imports the top net-new prospects into Zoho CRM as Leads once a month. Scoring runs entirely offline (no internet, no API calls needed); the research brief step uses the Anthropic API with web search.
 
 ---
 
@@ -65,7 +65,46 @@ The exact number matters less than the tier. Anyone in Top is worth running the 
 
 ---
 
-## Step 3 -- Monthly Batch Import to Zoho CRM
+## Step 3 -- Research a Top Prospect
+
+Once you have `scored_leads.csv`, run the research agent on anyone in the Top or Strong tier.
+
+**Option A -- Enter details manually:**
+```
+python research_prospect.py
+```
+You will be prompted for name, company, title, and optional LinkedIn URL.
+
+**Option B -- Use the row number from scored_leads.csv:**
+```
+python research_prospect.py --row 3
+```
+This pulls row 3 directly so you do not have to retype anything. Open `scored_leads.csv` first to find the row number of the person you want.
+
+The agent:
+- Searches the web for recent activity by that person and their company
+- Maps findings to [YOUR_COMPANY]'s services
+- Prints a structured brief to the terminal
+- Automatically saves the brief to the `/briefs/` folder
+
+Uses the Anthropic API with the `web_search` tool, so this step costs API credits (unlike scoring, which is free/offline). Only run it on prospects worth the research.
+
+---
+
+## Step 4 -- What To Do With the Brief
+
+The brief is designed to feed directly into the outreach email agent.
+
+1. Open the saved `.txt` file from `/briefs/`
+2. Go to the outreach agent folder
+3. Paste the brief as context when drafting the email
+4. The outreach agent will use the research to write a specific, relevant opening
+
+If the Confidence rating is Low, review the brief before sending anything. It means the web search did not return much and you may want to verify details first.
+
+---
+
+## Step 5 -- Monthly Batch Import to Zoho CRM
 
 `monthly_lead_import.py` runs the monthly automation: score a fresh connections CSV, skip anyone already surfaced in a prior run, cross-reference Zoho CRM, and create Leads for the top net-new prospects.
 
@@ -98,15 +137,27 @@ Scoring itself (role/industry fit, recruiter penalty, student cap) is unchanged 
 **"File not found" when running score_leads.py**
 Make sure the CSV is in the same folder as `score_leads.py` and the filename matches exactly what you typed.
 
+**"scored_leads.csv not found" when running research_prospect.py**
+Run `score_leads.py` first to generate it.
+
+**API key error**
+The research agent reads `ANTHROPIC_API_KEY` from the `.env` file in this folder. Make sure it's set there.
+
+**Research takes a long time**
+Normal. Web search takes 20-40 seconds per prospect. Do not close the terminal.
+
 ---
 
 ## File Reference
 
 ```
 linkedin-lead-agent/
-  monthly_lead_import.py  Monthly scorer -> Zoho CRM import automation
-  score_leads.py          Scoring rules -- imported by monthly_lead_import.py
-  test_score.py           Scoring verification -- run once to confirm logic
-  AGENT.md                This file
-  MONTHLY_IMPORT_README.md  Runbook for the monthly import
+  monthly_lead_import.py    Monthly scorer -> Zoho CRM import automation
+  score_leads.py             Scoring rules -- imported by monthly_lead_import.py
+  research_prospect.py       Deep research agent -- one prospect at a time (uses API credits)
+  test_score.py              Scoring verification -- run once to confirm logic
+  AGENT.md                   This file
+  MONTHLY_IMPORT_README.md   Runbook for the monthly import
+  scored_leads.csv           Generated after you run score_leads.py
+  briefs/                    Research briefs saved here automatically
 ```
